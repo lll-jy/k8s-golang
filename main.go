@@ -24,7 +24,7 @@ func main() {
 }
 
 func handleK8sCommand(reader *bufio.Reader) {
-	fmt.Print("Task (view or create): ")
+	fmt.Print("Task (view, create, or delete): ")
 	task := readInput(reader)
 	if task == "view" {
 		clientset := connectToK8s()
@@ -44,6 +44,13 @@ func handleK8sCommand(reader *bufio.Reader) {
 		fmt.Print("Container image: ")
 		image := readInput(reader)
 		launchK8sDeployment(clientset, namespace, appName, deploymentName, containerName, image)
+	} else if task == "delete" {
+		clientset := connectToK8s()
+		fmt.Print("Namespace: ")
+		namespace := readInput(reader)
+		fmt.Print("Deployment name: ")
+		deploymentName := readInput(reader)
+		deleteK8sDeployment(clientset, namespace, deploymentName)
 	} else if task == "exit" {
 		os.Exit(0)
 	} else {
@@ -136,7 +143,21 @@ func launchK8sDeployment(
 		log.Fatalf("Cannot create deployment: %v", err.Error())
 	}
 	log.Printf("Created deployment %v.", result.GetObjectMeta().GetName())
+}
 
+func deleteK8sDeployment(
+	clientset *kubernetes.Clientset,
+	namespace string,
+	deploymentName string) {
+	deletePolicy := metav1.DeletePropagationForeground
+	deploymentClient := clientset.AppsV1().Deployments(namespace)
+
+	if err := deploymentClient.Delete(context.TODO(), deploymentName, metav1.DeleteOptions{
+		PropagationPolicy: &deletePolicy,
+	}); err != nil {
+		log.Fatalf("Cannot delete deployment: %v", err.Error())
+	}
+	log.Printf("Deleted deployment %v", deploymentName)
 }
 
 func getPods(clientset *kubernetes.Clientset, namespace string) {

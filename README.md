@@ -7,5 +7,5 @@
 
 ## Instructions after launching the program
 
-In the line asking for `Task (view or create): `, type in a task. Valid tasks are `view`, `create`, and `exit`. Then 
-follow the tips as provided in the stdout to provide further input.
+In the line asking for `Task (view, create, or delete): `, type in a task. Valid tasks are `view`, `create`, `delete`, 
+and `exit`. Then follow the tips as provided in the stdout to provide further input.
