@@ -1,17 +1,22 @@
 package main
 
 import (
+	"context"
 	"flag"
-	"fmt"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
+
+	batchv1 "k8s.io/api/batch/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 func main() {
-
+	getJobs()
 }
 
 // https://rancher.com/using-kubernetes-api-go-kubecon-2017-session-recap
@@ -23,14 +28,15 @@ func main() {
 
 // https://dev.to/narasimha1997/create-kubernetes-jobs-in-golang-using-k8s-client-go-api-59ej
 func getJobs() {
-	clientset := connectToK8s()
 	jobName := flag.String("jobname", "test-job", "The name of the job")
 	containerImage := flag.String("image", "ubuntu:latest", "Name of the container image")
 	entryCommand := flag.String("command", "ls", "The command to run inside the container")
 
 	flag.Parse()
 
-	fmt.Printf("Args : %s %s %s\n", *jobName, *containerImage, *entryCommand)
+	clientset := connectToK8s()
+	launchK8sJob(clientset, jobName, containerImage, entryCommand)
+	// clientset.AppsV1().Deployments()
 }
 
 func connectToK8s() *kubernetes.Clientset {
@@ -39,9 +45,9 @@ func connectToK8s() *kubernetes.Clientset {
 		home = "/root"
 	}
 
-	confitPath := filepath.Join(home, ".kube", "config")
+	configPath := filepath.Join(home, ".kube", "config")
 
-	config, err := clientcmd.BuildConfigFromFlags("", confitPath)
+	config, err := clientcmd.BuildConfigFromFlags("", configPath)
 	if err != nil {
 		log.Panicln("failed to create K8s config")
 	}
@@ -52,4 +58,38 @@ func connectToK8s() *kubernetes.Clientset {
 	}
 
 	return clientset
+}
+
+func launchK8sJob(clientset *kubernetes.Clientset, jobName *string, image *string, cmd *string) {
+	jobs := clientset.BatchV1().Jobs("default")
+	var backOffLimit int32 = 0
+
+	jobSpec := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: *jobName,
+			Namespace: "default",
+		},
+		Spec: batchv1.JobSpec{
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: *jobName,
+							Image: *image,
+							Command: strings.Split(*cmd, " "),
+						},
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+			},
+			BackoffLimit: &backOffLimit,
+		},
+	}
+
+	_, err := jobs.Create(context.TODO(), jobSpec, metav1.CreateOptions{})
+	if err != nil {
+		log.Fatalln("Failed to create K8s job.")
+	}
+
+	log.Println("Created K8s job successfully.")
 }
