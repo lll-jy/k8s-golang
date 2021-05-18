@@ -1,62 +1,55 @@
 package main
 
 import (
+	"bufio"
 	"context"
-	"flag"
-	"log"
-	"os"
-	"path/filepath"
-	"strings"
-
-	batchv1 "k8s.io/api/batch/v1"
+	"fmt"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"log"
+	"os"
+	"path/filepath"
 )
 
+// reference: https://dev.to/narasimha1997/create-kubernetes-jobs-in-golang-using-k8s-client-go-api-59ej
+
 func main() {
-	handleK8s()
+	stdReader := bufio.NewReader(os.Stdin)
+	for {
+		handleK8sCommand(stdReader)
+	}
 }
 
-// https://rancher.com/using-kubernetes-api-go-kubecon-2017-session-recap
-/*func getClient(pathToCfg string) (*kubernetes.Clientset, error) {
-	var config *rest.Confit
-	var err error
-	return nil, nil
-}*/
-
-// https://dev.to/narasimha1997/create-kubernetes-jobs-in-golang-using-k8s-client-go-api-59ej
-func handleK8s() {
-	toCreate := flag.String("tocreate", "false", "Whether to create a new job")
-	jobName := flag.String("jobname", "test-job", "The name of the job")
-	containerImage := flag.String("image", "ubuntu:latest", "Name of the container image")
-	entryCommand := flag.String("command", "ls", "The command to run inside the container")
-
-	flag.Parse()
-
-	clientset := connectToK8s()
-	if *toCreate == "true" {
-		launchK8sJob(clientset, jobName, containerImage, entryCommand)
+func handleK8sCommand(reader *bufio.Reader) {
+	fmt.Print("Task (view or create): ")
+	task := readInput(reader)
+	if task == "view" {
+		clientset := connectToK8s()
+		fmt.Print("Namespace (empty for all): ")
+		namespace := readInput(reader)
+		getPods(clientset, &namespace)
+	} else if task == "create" {
+		clientset := connectToK8s()
+		fmt.Print("Namespace: ")
+		namespace := readInput(reader)
+		fmt.Print("Deployment name: ")
+		deploymentName := readInput(reader)
+		fmt.Print("Container image: ")
+		image := readInput(reader)
+		launchK8sDeployment(clientset, &namespace, &deploymentName, &image)
+	} else if task == "exit" {
+		os.Exit(0)
 	}
+}
 
-	namespaces, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+func readInput(reader *bufio.Reader) string {
+	result, err := reader.ReadString('\n')
 	if err != nil {
-		log.Fatalf("Cannot get list of namespaces: %v", err.Error())
+		fmt.Errorf("Cannot read input: %v", err.Error())
 	}
-	for i, ns := range namespaces.Items {
-		name := ns.Name
-		log.Printf("Namespace %d, %v", i, name)
-
-		pods, err := clientset.CoreV1().Pods(name).List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			log.Fatalf("Cannot get pods of namespace %v: %v", name, err.Error())
-		}
-		for j, p := range pods.Items {
-			podName := p.Name
-			log.Printf("Pod %d, %v", j, podName)
-		}
-	}
+	return result[:(len(result) - 1)]
 }
 
 func connectToK8s() *kubernetes.Clientset {
@@ -80,36 +73,60 @@ func connectToK8s() *kubernetes.Clientset {
 	return clientset
 }
 
-func launchK8sJob(clientset *kubernetes.Clientset, jobName *string, image *string, cmd *string) {
-	jobs := clientset.BatchV1().Jobs("default")
-	var backOffLimit int32 = 0
+func launchK8sDeployment(clientset *kubernetes.Clientset, namespace *string, deploymentName *string,
+	image *string) {
+	if *namespace == "" {
+		*namespace = "default"
+	}
 
-	jobSpec := &batchv1.Job{
+	deployments := clientset.CoreV1().Pods(*namespace)
+
+	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: *jobName,
-			Namespace: "default",
+			Name: *deploymentName,
+			Namespace: *namespace,
 		},
-		Spec: batchv1.JobSpec{
-			Template: v1.PodTemplateSpec{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name: *jobName,
-							Image: *image,
-							Command: strings.Split(*cmd, " "),
-						},
-					},
-					RestartPolicy: v1.RestartPolicyNever,
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: *deploymentName,
+					Image: *image,
 				},
 			},
-			BackoffLimit: &backOffLimit,
+			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
 
-	_, err := jobs.Create(context.TODO(), jobSpec, metav1.CreateOptions{})
+	_, err := deployments.Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
-		log.Fatalln("Failed to create K8s job.")
+		log.Fatalf("Failed to create K8s deployment: %v", err.Error())
 	}
 
-	log.Println("Created K8s job successfully.")
+	log.Println("Created K8s deployment.")
+}
+
+func getPods(clientset *kubernetes.Clientset, namespace *string) {
+	if *namespace == "" {
+		namespaces, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			log.Fatalf("Cannot get list of namespaces: %v", err.Error())
+		}
+		for _, ns := range namespaces.Items {
+			name := ns.Name
+			getPodsOfNamespace(clientset, name)
+		}
+	} else {
+		getPodsOfNamespace(clientset, *namespace)
+	}
+}
+
+func getPodsOfNamespace(clientset *kubernetes.Clientset, name string) {
+	pods, err := clientset.CoreV1().Pods(name).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		log.Fatalf("Cannot get pods of namespace %v: %v", name, err.Error())
+	}
+
+	for _, p := range pods.Items {
+		log.Printf("Pod of namespace %v: %v", name, p.Name)
+	}
 }
