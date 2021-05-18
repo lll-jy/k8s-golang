@@ -16,24 +16,21 @@ import (
 
 func Test(t *testing.T) {
 	clientset := connectToK8s()
+	deploymentName := "kubernetes-bootcamp"
+	var newPods map[string]bool
 
-	t.Run("One iteration", func(t *testing.T) {
-		deploymentName := "kubernetes-bootcamp"
-		var newPods map[string]bool
+	t.Run("Create", func(t *testing.T) {
+		newPods = createUnitTest(t, clientset, deploymentName)
+	})
 
-		t.Run("Create", func(t *testing.T) {
-			newPods = createUnitTest(t, clientset, deploymentName)
-		})
+	// Test log: https://stackoverflow.com/questions/44119951/how-to-check-a-log-output-in-go-test
+	t.Run("View", func(t *testing.T) {
+		viewUnitTest(t, clientset, newPods)
+	})
 
-		// Test log: https://stackoverflow.com/questions/44119951/how-to-check-a-log-output-in-go-test
-		t.Run("View", func(t *testing.T) {
-			viewUnitTest(t, clientset, newPods)
-		})
-
-		t.Run("Delete", func(t *testing.T) {
-			deletedPods := deleteUnitTest(t, clientset, deploymentName)
-			checkIsValidDelete(t, deletedPods, newPods)
-		})
+	t.Run("Delete", func(t *testing.T) {
+		deletedPods := deleteUnitTest(t, clientset, deploymentName)
+		checkIsValidDelete(t, deletedPods, newPods)
 	})
 }
 
