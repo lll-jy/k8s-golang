@@ -18,21 +18,20 @@ import (
 
 func main() {
 	stdReader := bufio.NewReader(os.Stdin)
+	clientset := connectToK8s()
 	for {
-		handleK8sCommand(stdReader)
+		handleK8sCommand(stdReader, clientset)
 	}
 }
 
-func handleK8sCommand(reader *bufio.Reader) {
+func handleK8sCommand(reader *bufio.Reader, clientset *kubernetes.Clientset) {
 	fmt.Print("Task (view, create, or delete): ")
 	task := readInput(reader)
 	if task == "view" {
-		clientset := connectToK8s()
 		fmt.Print("Namespace (empty for all): ")
 		namespace := readInput(reader)
 		getPods(clientset, namespace)
 	} else if task == "create" {
-		clientset := connectToK8s()
 		fmt.Print("Namespace: ")
 		namespace := readInput(reader)
 		fmt.Print("App name: ")
@@ -45,7 +44,6 @@ func handleK8sCommand(reader *bufio.Reader) {
 		image := readInput(reader)
 		launchK8sDeployment(clientset, namespace, appName, deploymentName, containerName, image)
 	} else if task == "delete" {
-		clientset := connectToK8s()
 		fmt.Print("Namespace: ")
 		namespace := readInput(reader)
 		fmt.Print("Deployment name: ")
