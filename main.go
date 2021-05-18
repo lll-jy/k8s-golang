@@ -36,7 +36,47 @@ func getJobs() {
 
 	clientset := connectToK8s()
 	launchK8sJob(clientset, jobName, containerImage, entryCommand)
-	// clientset.AppsV1().Deployments()
+
+	//clientset.CoreV1().Endpoints()
+	//clientset.CoreV1().ConfigMaps()
+	//clientset.CoreV1().Events()
+	//clientset.CoreV1().ComponentStatuses()
+	//clientset.CoreV1().LimitRanges()
+	//clientset.CoreV1().Namespaces()
+	clientset.CoreV1().PersistentVolumeClaims()
+	clientset.CoreV1().PersistentVolumes()
+	//clientset.CoreV1().Nodes()
+	clientset.CoreV1().Pods()
+	clientset.CoreV1().PodTemplates()
+	clientset.CoreV1().ReplicationControllers()
+	clientset.CoreV1().ResourceQuotas()
+	clientset.CoreV1().Secrets()
+	clientset.CoreV1().ServiceAccounts()
+	clientset.CoreV1().Services()
+
+	clientset.DiscoveryV1().EndpointSlices()
+
+	clientset.EventsV1().Events()
+
+	clientset.NetworkingV1().NetworkPolicies()
+	clientset.NetworkingV1().Ingresses()
+	clientset.NetworkingV1().IngressClasses()
+
+	clientset.NodeV1().RuntimeClasses()
+
+	clientset.PolicyV1().PodDisruptionBudgets()
+
+	clientset.RbacV1().ClusterRoleBindings()
+	clientset.RbacV1().ClusterRoles()
+	clientset.RbacV1().Roles()
+	clientset.RbacV1().RoleBindings()
+
+	clientset.SchedulingV1().PriorityClasses()
+
+	clientset.StorageV1().StorageClasses()
+	clientset.StorageV1().CSINodes()
+	clientset.StorageV1().CSIDrivers()
+	clientset.StorageV1().VolumeAttachments()
 }
 
 func connectToK8s() *kubernetes.Clientset {
