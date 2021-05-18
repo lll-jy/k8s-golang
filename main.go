@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	getJobs()
+	handleK8s()
 }
 
 // https://rancher.com/using-kubernetes-api-go-kubecon-2017-session-recap
@@ -27,7 +27,8 @@ func main() {
 }*/
 
 // https://dev.to/narasimha1997/create-kubernetes-jobs-in-golang-using-k8s-client-go-api-59ej
-func getJobs() {
+func handleK8s() {
+	toCreate := flag.String("tocreate", "false", "Whether to create a new job")
 	jobName := flag.String("jobname", "test-job", "The name of the job")
 	containerImage := flag.String("image", "ubuntu:latest", "Name of the container image")
 	entryCommand := flag.String("command", "ls", "The command to run inside the container")
@@ -35,48 +36,27 @@ func getJobs() {
 	flag.Parse()
 
 	clientset := connectToK8s()
-	launchK8sJob(clientset, jobName, containerImage, entryCommand)
+	if *toCreate == "true" {
+		launchK8sJob(clientset, jobName, containerImage, entryCommand)
+	}
 
-	//clientset.CoreV1().Endpoints()
-	//clientset.CoreV1().ConfigMaps()
-	//clientset.CoreV1().Events()
-	//clientset.CoreV1().ComponentStatuses()
-	//clientset.CoreV1().LimitRanges()
-	//clientset.CoreV1().Namespaces()
-	clientset.CoreV1().PersistentVolumeClaims()
-	clientset.CoreV1().PersistentVolumes()
-	//clientset.CoreV1().Nodes()
-	clientset.CoreV1().Pods()
-	clientset.CoreV1().PodTemplates()
-	clientset.CoreV1().ReplicationControllers()
-	clientset.CoreV1().ResourceQuotas()
-	clientset.CoreV1().Secrets()
-	clientset.CoreV1().ServiceAccounts()
-	clientset.CoreV1().Services()
+	namespaces, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		log.Fatalf("Cannot get list of namespaces: %v", err.Error())
+	}
+	for i, ns := range namespaces.Items {
+		name := ns.Name
+		log.Printf("Namespace %d, %v", i, name)
 
-	clientset.DiscoveryV1().EndpointSlices()
-
-	clientset.EventsV1().Events()
-
-	clientset.NetworkingV1().NetworkPolicies()
-	clientset.NetworkingV1().Ingresses()
-	clientset.NetworkingV1().IngressClasses()
-
-	clientset.NodeV1().RuntimeClasses()
-
-	clientset.PolicyV1().PodDisruptionBudgets()
-
-	clientset.RbacV1().ClusterRoleBindings()
-	clientset.RbacV1().ClusterRoles()
-	clientset.RbacV1().Roles()
-	clientset.RbacV1().RoleBindings()
-
-	clientset.SchedulingV1().PriorityClasses()
-
-	clientset.StorageV1().StorageClasses()
-	clientset.StorageV1().CSINodes()
-	clientset.StorageV1().CSIDrivers()
-	clientset.StorageV1().VolumeAttachments()
+		pods, err := clientset.CoreV1().Pods(name).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			log.Fatalf("Cannot get pods of namespace %v: %v", name, err.Error())
+		}
+		for j, p := range pods.Items {
+			podName := p.Name
+			log.Printf("Pod %d, %v", j, podName)
+		}
+	}
 }
 
 func connectToK8s() *kubernetes.Clientset {
