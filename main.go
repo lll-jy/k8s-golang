@@ -28,10 +28,12 @@ func handleK8sCommand(reader *bufio.Reader, clientset *kubernetes.Clientset) {
 	fmt.Print("Task (view, create, or delete): ")
 	task := readInput(reader)
 	if task == "view" {
+		printNamespaces(clientset)
 		fmt.Print("Namespace (empty for all): ")
 		namespace := readInput(reader)
 		getPods(clientset, namespace)
 	} else if task == "create" {
+		printNamespaces(clientset)
 		fmt.Print("Namespace: ")
 		namespace := readInput(reader)
 		fmt.Print("App name: ")
@@ -44,6 +46,7 @@ func handleK8sCommand(reader *bufio.Reader, clientset *kubernetes.Clientset) {
 		image := readInput(reader)
 		launchK8sDeployment(clientset, namespace, appName, deploymentName, containerName, image)
 	} else if task == "delete" {
+		printNamespaces(clientset)
 		fmt.Print("Namespace: ")
 		namespace := readInput(reader)
 		fmt.Print("Deployment name: ")
@@ -83,6 +86,23 @@ func connectToK8s() *kubernetes.Clientset {
 	}
 
 	return clientset
+}
+
+func printNamespaces(clientset *kubernetes.Clientset) {
+	fmt.Print("Existing namespaces: ")
+	namespaces := getNamespaces(clientset)
+	for _, ns := range namespaces {
+		fmt.Print(ns.Name, " ")
+	}
+	fmt.Println()
+}
+
+func getNamespaces(clientset *kubernetes.Clientset) []v1.Namespace {
+	namespaces, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		log.Fatalf("Cannot get list of namespaces: %v", err.Error())
+	}
+	return namespaces.Items
 }
 
 // https://github.com/kubernetes/client-go/blob/master/examples/create-update-delete-deployment/main.go
@@ -160,11 +180,8 @@ func deleteK8sDeployment(
 
 func getPods(clientset *kubernetes.Clientset, namespace string) {
 	if namespace == "" {
-		namespaces, err := clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			log.Fatalf("Cannot get list of namespaces: %v", err.Error())
-		}
-		for _, ns := range namespaces.Items {
+		namespaces := getNamespaces(clientset)
+		for _, ns := range namespaces {
 			name := ns.Name
 			getPodsOfNamespace(clientset, name)
 		}
